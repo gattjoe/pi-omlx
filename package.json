@@ -1,0 +1,37 @@
+{
+  "name": "pi-omlx",
+  "version": "0.0.1",
+  "description": "OMLX inference stats (model loading, prefill, generation, tok/s) in the Pi coding agent's working prompt and status bar.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "omlx",
+    "mlx",
+    "stats",
+    "status"
+  ],
+  "author": "Joe Gatt",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gattjoe/pi-omlx.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gattjoe/pi-omlx/issues"
+  },
+  "homepage": "https://github.com/gattjoe/pi-omlx#readme",
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}
