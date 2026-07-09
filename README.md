@@ -29,7 +29,7 @@ The memory figure uses omlx's hard limit, not the soft limit. This is not config
 
 ## Configuration
 
-If an API key is stored in Pi's auth storage under `omlx` (e.g. via [pi-omlx-picker](https://pi.dev/packages/pi-omlx-picker?name=omlx)), it is used first — pi-omlx-picker is the recommended way to configure the omlx model and API key. Otherwise these env variables apply (defaults given):
+If an API key is stored in Pi's auth storage under `omlx` it is used first — pi-omlx-picker is the recommended way to configure the omlx model and API key. Otherwise these env variables apply (defaults given):
 
 ```sh
 # Omlx base url.

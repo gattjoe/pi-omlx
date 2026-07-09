@@ -80,14 +80,43 @@ function normalizeUrl(raw: string): string {
     return trimmed.endsWith("/v1") ? trimmed : `${trimmed}/v1`;
 }
 
+function adminBase(cfg: { apiRoot: string } | null): string {
+    return cfg ? cfg.apiRoot.replace(/\/v1$/, "") : DEFAULT_OMLX_BASE_URL.replace("/v1", "");
+}
+
 function adminUrl(): string {
-    const cfg = resolveOmlxConfig();
-    const base = cfg ? cfg.apiRoot.replace(/\/v1$/, "") : DEFAULT_OMLX_BASE_URL.replace("/v1", "");
-    return base + "/admin/api/stats";
+    return adminBase(resolveOmlxConfig()) + "/admin/api/stats";
 }
 
 // state — current request model id from fetch intercept, used to find exact model in stats
 let activeModelId: string | null = null;
+
+// /admin/api/stats is gated by a signed admin session cookie, not by the same
+// Bearer api_key that /v1 accepts — oMLX's require_admin() only reads
+// omlx_admin_session, and /admin/api/login only accepts the server's *main*
+// api_key (sub-keys are rejected by design). So: try to log in once per
+// session to get a cookie; if that fails (e.g. our key is a sub-key), stop
+// polling instead of hammering the endpoint every 300ms forever.
+let adminSessionCookie: string | null = null;
+let adminLoginFailed = false;
+
+async function loginToAdmin(cfg: { apiRoot: string; apiKey: string }): Promise<boolean> {
+    try {
+        const res = await fetch(`${adminBase(cfg)}/admin/api/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ api_key: cfg.apiKey }),
+        });
+        if (!res.ok) return false;
+        const setCookie = res.headers.get("set-cookie");
+        const match = setCookie?.match(/omlx_admin_session=[^;]+/);
+        if (!match) return false;
+        adminSessionCookie = match[0];
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 interface OmlxStreamUsage {
     prompt_eval_duration?: number;
@@ -139,9 +168,36 @@ function updateWorking(msg: string) {
 
 // stats polling
 
+let pollInFlight = false;
+
 async function pollStats(): Promise<void> {
+    if (adminLoginFailed || pollInFlight) return;
+    pollInFlight = true;
     try {
-        const stats = await (await fetch(adminUrl())).json() as OmlxStatsResponse;
+        const cfg = resolveOmlxConfig();
+        if (!cfg) return;
+
+        if (!adminSessionCookie && !(await loginToAdmin(cfg))) {
+            adminLoginFailed = true;
+            return;
+        }
+
+        let res = await fetch(adminUrl(), { headers: { Cookie: adminSessionCookie! } });
+        if (res.status === 401) {
+            // Cookie expired or was never valid — one fresh login attempt before giving up.
+            adminSessionCookie = null;
+            if (!(await loginToAdmin(cfg))) {
+                adminLoginFailed = true;
+                return;
+            }
+            res = await fetch(adminUrl(), { headers: { Cookie: adminSessionCookie! } });
+        }
+        if (!res.ok) {
+            adminLoginFailed = true;
+            return;
+        }
+
+        const stats = await res.json() as OmlxStatsResponse;
         const am = stats.active_models;
         if (!am) return;
 
@@ -215,7 +271,9 @@ async function pollStats(): Promise<void> {
                 break;
             }
         }
-    } catch { }
+    } catch { } finally {
+        pollInFlight = false;
+    }
 }
 
 // fetch interception
@@ -290,6 +348,9 @@ function resetState() {
     lastTpsDisplay = null;
     activeModelId = null;
     lastCachedTokens = 0;
+    adminSessionCookie = null;
+    adminLoginFailed = false;
+    pollInFlight = false;
 }
 
 // extension entry
