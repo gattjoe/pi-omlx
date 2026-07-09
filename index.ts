@@ -183,7 +183,7 @@ async function pollStats(): Promise<void> {
 
         if (!adminSessionCookie && !(await loginToAdmin(cfg))) {
             adminLoginFailed = true;
-            setAdminWarn("⚠ omlx admin key rejected — use the server's main API key to see loading/prefill/generation detail");
+            setAdminWarn("omlx api key rejected");
             return;
         }
 
@@ -193,14 +193,14 @@ async function pollStats(): Promise<void> {
             adminSessionCookie = null;
             if (!(await loginToAdmin(cfg))) {
                 adminLoginFailed = true;
-                setAdminWarn("⚠ omlx admin key rejected — use the server's main API key to see loading/prefill/generation detail");
+                setAdminWarn("omlx api key rejected");
                 return;
             }
             res = await fetch(adminUrl(), { headers: { Cookie: adminSessionCookie! } });
         }
         if (!res.ok) {
             adminLoginFailed = true;
-            setAdminWarn("⚠ omlx admin key rejected — use the server's main API key to see loading/prefill/generation detail");
+            setAdminWarn("omlx api key rejected");
             return;
         }
 
