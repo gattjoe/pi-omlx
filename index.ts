@@ -100,22 +100,26 @@ let activeModelId: string | null = null;
 let adminSessionCookie: string | null = null;
 let adminLoginFailed = false;
 
-async function loginToAdmin(cfg: { apiRoot: string; apiKey: string }): Promise<boolean> {
+// returns null on success, or a human-readable reason on failure — distinguishing
+// network/TLS errors from an actual credential rejection matters, since a wrong
+// scheme/host looks identical to a bad key if collapsed to a boolean.
+async function loginToAdmin(cfg: { apiRoot: string; apiKey: string }): Promise<string | null> {
+    let res: Response;
     try {
-        const res = await fetch(`${adminBase(cfg)}/admin/api/login`, {
+        res = await fetch(`${adminBase(cfg)}/admin/api/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ api_key: cfg.apiKey }),
         });
-        if (!res.ok) return false;
-        const setCookie = res.headers.get("set-cookie");
-        const match = setCookie?.match(/omlx_admin_session=[^;]+/);
-        if (!match) return false;
-        adminSessionCookie = match[0];
-        return true;
-    } catch {
-        return false;
+    } catch (err) {
+        return `omlx admin login unreachable: ${err instanceof Error ? err.message : String(err)}`;
     }
+    if (!res.ok) return `omlx rejected the key (HTTP ${res.status}) — must be the server's main API key`;
+    const setCookie = res.headers.get("set-cookie");
+    const match = setCookie?.match(/omlx_admin_session=[^;]+/);
+    if (!match) return "omlx succeeded but returned no session cookie";
+    adminSessionCookie = match[0];
+    return null;
 }
 
 interface OmlxStreamUsage {
@@ -181,26 +185,30 @@ async function pollStats(): Promise<void> {
         const cfg = resolveOmlxConfig();
         if (!cfg) return;
 
-        if (!adminSessionCookie && !(await loginToAdmin(cfg))) {
-            adminLoginFailed = true;
-            setAdminWarn("omlx api key rejected");
-            return;
+        if (!adminSessionCookie) {
+            const err = await loginToAdmin(cfg);
+            if (err) {
+                adminLoginFailed = true;
+                setAdminWarn(`⚠ ${err}`);
+                return;
+            }
         }
 
         let res = await fetch(adminUrl(), { headers: { Cookie: adminSessionCookie! } });
         if (res.status === 401) {
             // Cookie expired or was never valid — one fresh login attempt before giving up.
             adminSessionCookie = null;
-            if (!(await loginToAdmin(cfg))) {
+            const err = await loginToAdmin(cfg);
+            if (err) {
                 adminLoginFailed = true;
-                setAdminWarn("omlx api key rejected");
+                setAdminWarn(`⚠ ${err}`);
                 return;
             }
             res = await fetch(adminUrl(), { headers: { Cookie: adminSessionCookie! } });
         }
         if (!res.ok) {
             adminLoginFailed = true;
-            setAdminWarn("omlx api key rejected");
+            setAdminWarn(`⚠ omlx admin stats request failed (HTTP ${res.status})`);
             return;
         }
 
