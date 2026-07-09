@@ -166,6 +166,10 @@ function updateWorking(msg: string) {
     if (turnCtx?.hasUI) turnCtx.ui.setWorkingMessage(msg);
 }
 
+function setAdminWarn(msg?: string) {
+    if (turnCtx?.hasUI) turnCtx.ui.setStatus("omlx-admin", msg);
+}
+
 // stats polling
 
 let pollInFlight = false;
@@ -179,6 +183,7 @@ async function pollStats(): Promise<void> {
 
         if (!adminSessionCookie && !(await loginToAdmin(cfg))) {
             adminLoginFailed = true;
+            setAdminWarn("⚠ omlx admin key rejected — use the server's main API key to see loading/prefill/generation detail");
             return;
         }
 
@@ -188,15 +193,18 @@ async function pollStats(): Promise<void> {
             adminSessionCookie = null;
             if (!(await loginToAdmin(cfg))) {
                 adminLoginFailed = true;
+                setAdminWarn("⚠ omlx admin key rejected — use the server's main API key to see loading/prefill/generation detail");
                 return;
             }
             res = await fetch(adminUrl(), { headers: { Cookie: adminSessionCookie! } });
         }
         if (!res.ok) {
             adminLoginFailed = true;
+            setAdminWarn("⚠ omlx admin key rejected — use the server's main API key to see loading/prefill/generation detail");
             return;
         }
 
+        setAdminWarn();
         const stats = await res.json() as OmlxStatsResponse;
         const am = stats.active_models;
         if (!am) return;
