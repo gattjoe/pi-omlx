@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { AuthStorage } from "@earendil-works/pi-coding-agent";
+import { readStoredCredential } from "@earendil-works/pi-coding-agent";
 
 const DEFAULT_OMLX_BASE_URL = "http://127.0.0.1:8000/v1";
 const EXTENSION_KEY = Symbol.for("pi-omlx/loaded");
@@ -68,7 +68,7 @@ function resolveOmlxConfig(): { apiRoot: string; apiKey: string } | null {
         return { apiRoot: envUrl ? normalizeUrl(envUrl) : DEFAULT_OMLX_BASE_URL, apiKey: envKey };
     }
 
-    const raw = AuthStorage.create().get("omlx");
+    const raw = readStoredCredential("omlx");
     const key = raw?.type === "api_key" ? raw.key : raw?.type === "oauth" ? raw.access : null;
     if (!key) return null;
     return { apiRoot: normalizeUrl((raw as any)?.baseUrl ?? envUrl ?? ""), apiKey: key };
