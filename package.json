@@ -27,7 +27,7 @@
   },
   "homepage": "https://github.com/gattjoe/pi-omlx#readme",
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.80.10"
+    "@earendil-works/pi-coding-agent": "*"
   },
   "pi": {
     "extensions": [
